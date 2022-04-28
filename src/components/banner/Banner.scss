@@ -1,0 +1,74 @@
+.banner {
+
+    position: relative;
+    z-index: 0;
+    height: 450px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    background-color: .444444;
+    font-family: 'Trebuchet MS', Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+
+    .banner-image {
+        transform: scale(3.0);
+        transition: inherit;
+    }
+
+    .banner-text-container {
+        color: white;
+        position: absolute;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 450px;
+        font-size: 90px;
+        text-shadow: 0 0 6px #C8D8E5;
+
+        .banner-text {
+            height: 1em;
+        }
+    }
+}
+
+@media (max-width: 800px) {
+    .banner {
+        height: 300px;
+
+        .banner-image {
+            transform: scale(2.5);
+        }
+
+        .banner-text-container {
+            height: 300px;
+        }
+
+        .banner-text-container {
+            font-size: 68px;
+            height: 300px;
+        }
+    }
+}
+
+@media (max-width: 680px) {
+    .banner {
+        .banner-text-container {
+            font-size: 55px;
+        }
+    }
+}
+
+@media (max-width: 520px) {
+    .banner {
+        .banner-image {
+            transform: scale(2.0);
+        }
+
+        .banner-text-container {
+            font-size: 45px;
+        }
+    }
+}

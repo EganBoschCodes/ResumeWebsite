@@ -1,0 +1,17 @@
+.counter-box {
+    background-color: rgb(228, 187, 146);
+    border-radius: 10%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    user-select: none;
+
+    width: 200px;
+    height: 200px;
+
+    p {
+        color: black;
+        font-size: 40px;
+    }
+}
