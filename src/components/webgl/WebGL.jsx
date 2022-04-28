@@ -44,6 +44,12 @@ class WebGL extends React.Component {
                 <Canvas>
                     <HyperRealShader vertex={ this.props.vertex } fragment={ this.props.fragment } aspect_ratio={ this.state.aspect_ratio }/>
                 </Canvas>
+                <Canvas>
+                    <MetaballShader vertex={ this.props.vertex } fragment={ this.props.fragment } aspect_ratio={ this.state.aspect_ratio }/>
+                </Canvas>
+                <Canvas>
+                    <CheckerShader vertex={ this.props.vertex } fragment={ this.props.fragment } aspect_ratio={ this.state.aspect_ratio }/>
+                </Canvas>
             </div>
         );
     }
