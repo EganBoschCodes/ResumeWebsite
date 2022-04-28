@@ -90,7 +90,7 @@ class Camera {
     }
 }
 
-class HyperRealShader extends React.Component {
+class MetaballShader extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
@@ -112,6 +112,8 @@ class HyperRealShader extends React.Component {
             uniform vec3 camera_heading_y;
             uniform vec3 camera_heading_z;
 
+            varying vec4[3] solids;
+
             varying float frames;
 
             float FOV = 1.5;
@@ -120,6 +122,8 @@ class HyperRealShader extends React.Component {
                 gl_Position = vec4(position, 1.0);
                 frames = time * 500.0;
                 pos = vec4(position.xy, FOV, aspect_ratio);
+
+                solids = vec4[](vec4(0, 0, -40, 60), vec4(100, 20, 80, 70), vec4(-90, 30, -70, 30));
             }`,
 
             frag_shader: `
@@ -135,211 +139,158 @@ class HyperRealShader extends React.Component {
 
             varying float frames;
 
-            vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
-            vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
-            vec3 fade(vec3 t) {return t*t*t*(t*(t*6.0-15.0)+10.0);}
+            varying vec4[3] solids;
 
-            float cnoise(vec3 P){
-                vec3 Pi0 = floor(P); // Integer part for indexing
-                vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1
-                Pi0 = mod(Pi0, 289.0);
-                Pi1 = mod(Pi1, 289.0);
-                vec3 Pf0 = fract(P); // Fractional part for interpolation
-                vec3 Pf1 = Pf0 - vec3(1.0); // Fractional part - 1.0
-                vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
-                vec4 iy = vec4(Pi0.yy, Pi1.yy);
-                vec4 iz0 = Pi0.zzzz;
-                vec4 iz1 = Pi1.zzzz;
-              
-                vec4 ixy = permute(permute(ix) + iy);
-                vec4 ixy0 = permute(ixy + iz0);
-                vec4 ixy1 = permute(ixy + iz1);
-              
-                vec4 gx0 = ixy0 / 7.0;
-                vec4 gy0 = fract(floor(gx0) / 7.0) - 0.5;
-                gx0 = fract(gx0);
-                vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
-                vec4 sz0 = step(gz0, vec4(0.0));
-                gx0 -= sz0 * (step(0.0, gx0) - 0.5);
-                gy0 -= sz0 * (step(0.0, gy0) - 0.5);
-              
-                vec4 gx1 = ixy1 / 7.0;
-                vec4 gy1 = fract(floor(gx1) / 7.0) - 0.5;
-                gx1 = fract(gx1);
-                vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
-                vec4 sz1 = step(gz1, vec4(0.0));
-                gx1 -= sz1 * (step(0.0, gx1) - 0.5);
-                gy1 -= sz1 * (step(0.0, gy1) - 0.5);
-              
-                vec3 g000 = vec3(gx0.x,gy0.x,gz0.x);
-                vec3 g100 = vec3(gx0.y,gy0.y,gz0.y);
-                vec3 g010 = vec3(gx0.z,gy0.z,gz0.z);
-                vec3 g110 = vec3(gx0.w,gy0.w,gz0.w);
-                vec3 g001 = vec3(gx1.x,gy1.x,gz1.x);
-                vec3 g101 = vec3(gx1.y,gy1.y,gz1.y);
-                vec3 g011 = vec3(gx1.z,gy1.z,gz1.z);
-                vec3 g111 = vec3(gx1.w,gy1.w,gz1.w);
-              
-                vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));
-                g000 *= norm0.x;
-                g010 *= norm0.y;
-                g100 *= norm0.z;
-                g110 *= norm0.w;
-                vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111, g111)));
-                g001 *= norm1.x;
-                g011 *= norm1.y;
-                g101 *= norm1.z;
-                g111 *= norm1.w;
-              
-                float n000 = dot(g000, Pf0);
-                float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
-                float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
-                float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
-                float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
-                float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
-                float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
-                float n111 = dot(g111, Pf1);
-              
-                vec3 fade_xyz = fade(Pf0);
-                vec4 n_z = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fade_xyz.z);
-                vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);
-                float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x); 
-                return 2.2 * n_xyz;
+            float modBetween(float a, float mn, float mx) {
+                return mod(a - mn, mx - mn) + mn;
+            }
+            
+            float merge(float a, float b) {
+                return min(a, b);
+            }
+            
+            float smin(float a, float b, float k) {
+              float h = clamp(0.5 + 0.5 * (a - b)/k, 0.0, 1.0);
+              return mix(a, b, h) - k * h * (1.0 - h);
+            }
+            
+            float intersection(float a, float b) {
+                return max(a, b);
+            }
+            
+            float removal(float a, float b) {
+                return max(a, -b);
+            }
+            
+            float satur(float a) {
+                return clamp((a + 1.0)/2.0, 0.0, 1.0);
+            }
+            
+            float bind(vec3 loc, float box_size) {
+                return min(box_size - loc.x, min(loc.x + box_size, min(box_size - loc.y, min(loc.y + box_size, min(box_size - loc.z, loc.z + box_size)))));
             }
 
-            vec3 getBallPos(float a, float b, float c) {
-                return vec3(120.0 * sin(frames / 2000.0 * a), 120.0 * sin(frames / 2000.0 * b), 120.0 * sin(frames / 2000.0 * c));
+
+            float sphereDist(vec3 loc, vec4 sphere) {
+                return length(loc - sphere.xyz) - sphere.w;
+            }
+            
+            float cubeDist(vec3 loc, vec4 cube) {
+                loc -= cube.xyz;
+                float maxOut = max(abs(loc.x), max(abs(loc.y), abs(loc.z)));
+                return maxOut - cube.w/2.0;
+            }
+            
+            float torusDist(vec3 loc, float[5] torus) {
+                loc -= vec3(torus[0], torus[1], torus[2]);
+                float lenHoriz = length(loc.xz);
+                return length(vec2(lenHoriz - torus[3], loc.y)) - torus[4];
             }
 
-            float ballWeight(int index, vec3 position, float[6] sizes, vec3[6] positions) {
-                float size = sizes[index];
-                vec3 offset = position - positions[index];
-                return size * size / (offset.x * offset.x + offset.y * offset.y + offset.z * offset.z);
+
+
+            float distEstimator(vec3 loc) {
+                return merge(merge(merge(torusDist(loc, float[5](0.0, -40.0, 100.0, 50.0, 20.0)), smin(sphereDist(loc, solids[2]), sphereDist(loc, solids[2] + vec4(-30.0,40.0,-30.0,10.0)), 30.0)), cubeDist(loc, solids[1])), abs(loc.x) < 3000.0 && abs(loc.z) < 3000.0 ? loc.y + 400.0 : 10000.0);
             }
 
-            float equation(vec3 pos, float[6] sizes, vec3[6] positions) {
-                float sum = 0.0;
-                for(int i = 0; i < 6; i++) {
-                    sum += ballWeight(i, pos, sizes, positions);
-                }
-                return sum /*+ cnoise(pos/3)/40*/;
+            vec3 getColor(vec3 loc) {
+                return torusDist(loc, float[5](0.0, -40.0, 100.0, 50.0, 20.0)) < 1.0 ? vec3(1.0, 0.0, 0.0) : cubeDist(loc, solids[1]) < 1.0 ? vec3(0.0, 1.0, 0.02) : loc.y < -200.0 ? vec3(1.0, 1.0, 1.0) : vec3(0.0, 0.0, 1.0);
             }
 
-            vec3 getGradient (vec3 pos, float[6] sizes, vec3[6] positions) {
-	
-                vec3 gradient = vec3(0.0);
-            
-                for (int index = 0; index < 6; index++) {
-                    vec3 offset = pos - positions[index];
-                    float offsetmagsq = dot(offset, offset);
-                    float factor = 2.0 * sizes[index] * sizes[index] / (offsetmagsq * offsetmagsq);
-                    gradient.x += factor * offset.x;
-                    gradient.y += factor * offset.y;
-                    gradient.z += factor * offset.z;
-                }
-            
-            
-                return normalize(gradient);
-            
-                /*float normEpsilon = 0.01;
-                float dx = equation(vec3(pos.x + normEpsilon, pos.yz)) - equation(vec3(pos.x - normEpsilon, pos.yz));
-                float dy = equation(vec3(pos.x, pos.y + normEpsilon, pos.z)) - equation(vec3(pos.x, pos.y - normEpsilon, pos.z));
-                float dz = equation(vec3(pos.xy, pos.z + normEpsilon)) - equation(vec3(pos.xy, pos.z - normEpsilon));
-            
-                return -normalize(vec3(dx, dy, dz));*/
-            
+            vec4 getMaterialProperties(vec3 loc) {
+                return loc.y < -200.0 ? vec4(0.4, 0.6, 0.0, 0.4) : vec4(0.8, 0.2, 2.5, 0.7);
             }
 
-            vec3 getColorAtPoint(vec3 pos, float[6] sizes, vec3[6] positions, vec3[6] colors) {
-                float differential = 3.0;
+            vec3 normAt(vec3 loc) {
+
+                float normEpsilon = 0.001;
+
+                float dx = distEstimator(vec3(loc.x + normEpsilon, loc.yz)) - distEstimator(vec3(loc.x - normEpsilon, loc.yz));
+                float dy = distEstimator(vec3(loc.x, loc.y + normEpsilon, loc.z)) - distEstimator(vec3(loc.x, loc.y - normEpsilon, loc.z));
+                float dz = distEstimator(vec3(loc.xy, loc.z + normEpsilon)) - distEstimator(vec3(loc.xy, loc.z - normEpsilon));
             
-                float weight1 = pow(ballWeight(0, pos, sizes, positions), differential);
-                float weight2 = pow(ballWeight(1, pos, sizes, positions), differential);
-                float weight3 = pow(ballWeight(2, pos, sizes, positions), differential);
-                float weight4 = pow(ballWeight(3, pos, sizes, positions), differential);
-                float weight5 = pow(ballWeight(4, pos, sizes, positions), differential);
-                float weight6 = pow(ballWeight(5, pos, sizes, positions), differential);
-            
-                float sum = weight1  + weight2  + weight3  + weight4  + weight5  + weight6;
-            
-                //int grid_size = 80;
-                //vec3 grid = vec3(int(pos.x) % grid_size, int(pos.y) % grid_size, int(pos.z) % grid_size);
+                return normalize(vec3(dx, dy, dz));
+            }
+
+            vec2 clearBetween(vec3 a, vec3 b) {
+                vec3 c = a;
+                float de = distEstimator(a);
+                vec3 dir = normalize(b - a);
                 
-                //int grid_sum = (grid.x < grid_size/2 ? 1 : 0) + (grid.y < grid_size/2 ? 1 : 0) + (grid.z < grid_size/2 ? 1 : 0);
+                float lastSteps = 0.0;
+                while(de > 0.01 && length(b - c) >= length(b - a)) {
+                    lastSteps++;
+                    a += dir * de;
+                    de = distEstimator(a);
+                }
             
-                //if(grid_sum % 2 == 0) {
-                    //sum *= 2;
-                //}
-                //vec3 gradient = getGradient(pos);
-                return (colors[0] * weight1 + colors[1] * weight2 + colors[2] * weight3 + colors[3] * weight4 + colors[4] * weight5 + colors[5] * weight6) / sum ;
-            
+                return vec2((de < 0.01) ? (length(a - b) < 1.0 ? 1.0 : 0.0) : 1.0, lastSteps);
             }
 
-            vec4 clampColor (float r, float g, float b) {
-
-                vec3 retcol = vec3(min(r, 1.0), min(g, 1.0), min(b, 1.0));
-                if(r > 1.0) {
-                    retcol.y += (r - 1.0) * 0.4;
-                    retcol.z += (r - 1.0) * 0.1;
-                }
-                if(g > 1.0) {
-                    retcol.x += (g - 1.0) * 0.25;
-                    retcol.z += (g - 1.0) * 0.25;
-                }
-                if(b > 1.0) {
-                    retcol.x += (b - 1.0) * 0.1;
-                    retcol.y += (b - 1.0) * 0.4;
-                }
-                return vec4(retcol, 1.0);
-            }
-
-            float stepSize(float eq) {
-                return max(10.0, 5.0/eq);
-            }
 
             void main() {
 
-                vec3 colors[6] = vec3[](vec3(1.0, 0.1, 0.0), vec3(0.5, 0.8, 0.1), vec3(0.0, 0.2, 1.0), vec3(0.8, 0.1, 0.2), vec3(1.0, 1.0, 0.1), vec3(0.22, 0.8, 0.42));
-                vec3 positions[6] = vec3[](getBallPos(5.0,3.0,7.0), getBallPos(4.7,-3.0,2.1), getBallPos(1.7,3.8,2.4), getBallPos(-3.2,1.0,-4.0), getBallPos(3.8,-7.2,5.3), getBallPos(8.3,5.2,-3.0));;
-                float sizes[6] = float[](30.0, 50.0, 30.0, 50.0, 70.0, 100.0);
-
-                vec3 light_source = vec3(200, 400, 100);
+                vec3 light_pos = vec3(200.0, 240.0, 280.0);
+                float lastSteps = 0.0;
 
                 vec3 ray = camera_position;
                 vec3 direction = normalize(camera_heading_x * pos.x * pos.w + camera_heading_y * pos.y + camera_heading_z * pos.z);
 
-                float stepsize;
-                float lasteq;
+                vec3 colorOutput = vec3(0, 0, 0);
+	            float continuedReflectiveness = 1.0;
+                const float shadow_intensity = 0.0;
 
-                while (distance(camera_position, ray) < 1000.0) {
-                    float eq = equation(ray, sizes, positions);
-
-                    if (eq > 1.0) {
-
-                        ray -= direction * stepsize * (eq-1.0)/(eq - lasteq);
-
-                        vec3 light_angle = normalize(light_source - ray);
-                        vec3 view_angle = normalize(camera_position - ray);
-
-                        vec3 gradient = getGradient(ray, sizes, positions);
-
-                        float diffuse = clamp(dot(light_angle, gradient), 0.0, 1.0) + 0.1;
-                        float specular = pow(clamp(dot(normalize(light_angle + view_angle), gradient), 0.0, 1.0), 20.0);
-
-                        vec3 ball_color = getColorAtPoint(ray, sizes, positions, colors);
-
-                        gl_FragColor = clampColor(diffuse * ball_color.x + specular, diffuse*ball_color.y + specular, diffuse*ball_color.z + specular);
-                        return;
+                vec3 colorData;
+                while (continuedReflectiveness > 0.05) {
+                    vec3 original = ray;
+                    ray += direction * 10.0;
+                    colorData = vec3(0.0, 0.0, 0.0);
+                    while(length(ray-original) < 8000.0) {
+                        float stepSize = distEstimator(ray);
+                        if(stepSize <= 0.01) {
+                            vec3 norm = normAt(ray);
+                            vec3 light_vec = normalize(ray - light_pos);
+                
+                            vec2 clearCheck = clearBetween(light_pos, ray);
+                            bool clear = clearCheck[0] == 1.0;
+                            lastSteps = clearCheck[1];
+                
+                            float light_dot = satur(dot(norm, -light_vec));
+                
+                            vec3 specular_reflection = reflect(direction, norm);
+                            float specular_dot = pow(satur(dot(specular_reflection, -light_vec)), 32.0);
+                
+                            direction = normalize(specular_reflection);
+                
+                            //x: diffuse light, y: ambient light, z: specular light, w: reflectiveness
+                            vec4 mat_properties = getMaterialProperties(ray);
+                
+                            vec3 finalColor = getColor(ray);
+                            finalColor *=  light_dot * mat_properties.x * (clear ? clamp((1.0-lastSteps/60.0) * (1.0-shadow_intensity), 0.0, 1.0 - shadow_intensity) + shadow_intensity : shadow_intensity) + mat_properties.y;
+                            finalColor += vec3(1.0, 1.0, 1.0) * specular_dot * mat_properties.z * (clear ? 1.0 : 0.0);
+                
+                            colorData = finalColor;
+                            break;
+                        }
+                        ray += direction * stepSize;
                     }
-                    
-                    stepsize = stepSize(eq);
-                    ray += direction * stepsize;
-                    lasteq = eq;
 
+                    float reflectiveness = getMaterialProperties(ray).w;
+                    if(length(colorData) > 0.0 && reflectiveness < 1.0) {
+                        colorOutput += reflectiveness * continuedReflectiveness * colorData;
+                        continuedReflectiveness *= 1.0 - reflectiveness;
+                    }
+                    else if(length(colorData) > 0.0) {
+                        colorOutput += colorData * continuedReflectiveness;
+                        break;
+                    }
+                    else {
+                        break;
+                    }
                 }
 
-                float light = 0.2 + abs(direction.y / 2.0);
-	            gl_FragColor = vec4(light * 0.3, light*0.5, light, 1.0);
+                colorOutput += colorData * continuedReflectiveness;
+                gl_FragColor = vec4(colorOutput, 1);
             }`
         }
     }
@@ -352,7 +303,14 @@ class HyperRealShader extends React.Component {
         //console.log(this.state.frag_shader);
         this.setState( {camera: this.state.camera.lookAt(0, -40, 0)} );
 
-        this.interval = setInterval( () => { this.setState( {time: (Date.now() - this.state.init_time) / 1000 });  }, 1000/60);
+        this.interval = setInterval( () => { 
+            this.setState( {
+                time: (Date.now() - this.state.init_time) / 1000,
+                camera: this.state.camera.moveTo(Math.cos(this.state.time) * 500, 100, Math.sin(this.state.time) * 500).lookAt(0, -40, 0)
+            });  
+        
+        
+        }, 1000/60);
     }
 
     componentWillUnmount () {
@@ -386,4 +344,4 @@ class HyperRealShader extends React.Component {
     }
 }
 
-export default HyperRealShader;
+export default MetaballShader;

@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 
 import './WebGL.scss';
 import CheckerShader from "./shaders/CheckerShader";
+import MetaballShader from "./shaders/MetaballShader";
 import HyperRealShader from "./shaders/HyperRealShader";
 
 
